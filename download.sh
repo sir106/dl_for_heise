@@ -113,35 +113,38 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
         fi
         $verbose && echo -e "${LOG_PFX} Issue found. Starting download sequence."
 
-# PDF Download Versuche
+        # PDF Download Versuche
         try=1
         success=false
         while [ $try -le $MAX_TRIES ]; do
             printf "${LOG_PFX} [Try $try/$MAX_TRIES] Downloading...\r"
             
-            # Header Check (Content-Type)
-            $verbose && echo -e "${LOG_PFX} Requesting HTTP headers to check Content-Type..."
-            CTYPE=$(curl -I ${CURL_OPTS} "https://www.heise.de/select/${MAGAZINE}/archiv/${year}/${i}/download" | grep -i "^Content-Type:" | tail -1 | cut -d' ' -f2 | tr -d '\r')
-            $verbose && echo -e "${LOG_PFX} Server returned Content-Type: $CTYPE"
+            # Direkter Download ohne HEAD-Request (spart Requests und vermeidet Rate-Limits)
+            DOWNLOAD_URL="https://www.heise.de/select/${MAGAZINE}/archiv/${year}/${i}/download"
+            $verbose && echo -e "\n${LOG_PFX} Starting download..."
+            SIZE=$(curl -# -b ${SESSION_FILE} -c ${SESSION_FILE} -L -k "$DOWNLOAD_URL" -o "${BASE_PATH}.pdf" -w "%{size_download}")
             
-            case "$CTYPE" in
-                *pdf*|*octet-stream*)
-                    # Tatsächlicher Download
-                    SIZE=$(curl -# -b ${SESSION_FILE} -L -k "https://www.heise.de/select/${MAGAZINE}/archiv/${year}/${i}/download" -o "${BASE_PATH}.pdf" -w "%{size_download}")
-                    
-                    if [ "$SIZE" -gt "$MIN_PDF_SIZE" ]; then
-                        printf "\n${LOG_PFX} ${SUCCESS} Fertig ($((SIZE/1024/1024)) MB)\n"
-                        success=true
-                        count_success=$((count_success+1))
-                        break
-                    else
-                        printf "\n${LOG_PFX} ${ERR} Datei zu klein ($SIZE Bytes).\n"
-                    fi
-                    ;;
-                *)
-                    printf "\n${LOG_PFX} ${ERR} Kein PDF (Typ: $CTYPE). Eventuell kein Abo?\n"
-                    ;;
-            esac
+            # Prüfen, ob die Datei groß genug für ein echtes PDF ist
+            if [ "$SIZE" -gt "$MIN_PDF_SIZE" ]; then
+                printf "\n${LOG_PFX} ${SUCCESS} Fertig ($((SIZE/1024/1024)) MB)\n"
+                
+                # In eigenes Logfile schreiben
+                echo "$(date '+%Y-%m-%d %H:%M:%S') - Erfolgreich geladen: ${BASE_PATH}.pdf - Quelle: $DOWNLOAD_URL" >> download_history.log
+                
+                success=true
+                count_success=$((count_success+1))
+                
+                # Kurze Pause nach Erfolg, um Sperren bei schnellen aufeinanderfolgenden Downloads zu verhindern
+                $verbose && echo -e "${LOG_PFX} Sleeping 15s to be polite to the server..."
+                sleep 15
+                break
+            else
+                # Wenn es zu klein ist, war es wahrscheinlich eine HTML Fehlerseite (Rate Limit / Kein Abo)
+                HTML_SNIPPET=$(head -c 150 "${BASE_PATH}.pdf" | tr '\n' ' ' | sed 's/  */ /g' 2>/dev/null)
+                printf "\n${LOG_PFX} ${ERR} Download fehlgeschlagen oder kein PDF (Größe: $SIZE Bytes).\n"
+                $verbose && echo -e "${LOG_PFX} Server response snippet: $HTML_SNIPPET..."
+                rm -f "${BASE_PATH}.pdf"
+            fi
             
             if [ $try -lt $MAX_TRIES ]; then
                 sleepbar $WAIT_TIME
@@ -150,7 +153,7 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
         done
 
         if [ "$success" = false ]; then
-            printf "${LOG_PFX} ${ERR} Download fehlgeschlagen.\n"
+            printf "${LOG_PFX} ${ERR} Download fehlgeschlagen nach $MAX_TRIES Versuchen.\n"
             count_fail=$((count_fail+1))
         fi
     done
