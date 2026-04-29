@@ -30,8 +30,8 @@ services:
       - LC_ALL=C.UTF-8
 
       # ENVIRONMENT XYZ
-      - HEISE_USER=${HEISE_USER}
-      - HEISE_PASS=${HEISE_PASS}
+      - HEISE_USERNAME=${HEISE_USERNAME}
+      - HEISE_PASSWORD=${HEISE_PASSWORD}
       - REPO_URL=${REPO_URL:-https://github.com/weese/dl_for_heise}
     env_file:
       - .env
@@ -52,7 +52,7 @@ services:
 
         # 3. Credentials schreiben
         # Beachte: Die Variablen müssen im env_file oder System definiert sein
-        echo "$${HEISE_USER}:$${HEISE_PASS}" > /app/.creds
+        echo "$${HEISE_USERNAME}:$${HEISE_PASSWORD}" > /app/.creds
         chmod 600 /app/.creds
 
         # 4. Hilfsskript erstellen
