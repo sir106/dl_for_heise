@@ -64,8 +64,8 @@ $verbose || CURL_OPTS="${CURL_OPTS} -s"
 # 1. Login Seite aufrufen & Tokens abgreifen
 LOGIN_HTML=$(curl ${CURL_OPTS} -F "username=${HEISE_USERNAME}" -F "password=${HEISE_PASSWORD}" -F "ajax=1" "https://www.heise.de/sso/login/login")
 
-# Extrahiere Tokens (nutzt grep mit Lookbehind für sauberere Ergebnisse)
-TOKENS=$(echo "$LOGIN_HTML" | grep -oP '(?<=token=")[^"]+')
+# Extrahiere Zeilen, die token=" enthalten, und schneide den Wert aus (optimiert für BusyBox / Docker)
+TOKENS=$(echo "$LOGIN_HTML" | grep -o 'token="[^"]*"' | cut -d'"' -f2)
 TOKEN1=$(echo "$TOKENS" | sed -n '1p')
 TOKEN2=$(echo "$TOKENS" | sed -n '2p')
 
@@ -98,38 +98,51 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
             [ "$i" -gt 13 ] && break || continue
         fi
 
-        # Download PDF
+# PDF Download Versuche
         try=1
         success=false
         while [ $try -le $MAX_TRIES ]; do
-            echo -ne "${LOG_PFX} [Try $try/$MAX_TRIES] Downloading...\r"
+            printf "${LOG_PFX} [Try $try/$MAX_TRIES] Downloading...\r"
             
-            # Header Check
+            # Header Check (Content-Type)
             CTYPE=$(curl -I ${CURL_OPTS} "https://www.heise.de/select/${MAGAZINE}/archiv/${year}/${i}/download" | grep -i "Content-Type" | cut -d' ' -f2 | tr -d '\r')
             
-            if [[ "$CTYPE" == *"octet-stream"* ]] || [[ "$CTYPE" == *"pdf"* ]]; then
-                SIZE=$(curl -# ${CURL_OPTS} "https://www.heise.de/select/${MAGAZINE}/archiv/${year}/${i}/download" -o "${BASE_PATH}.pdf" -w "%{size_download}")
-                
-                if [ "$SIZE" -gt "$MIN_PDF_SIZE" ]; then
-                    echo -e "${LOG_PFX} ${SUCCESS} Fertig ($((SIZE/1024/1024)) MB)"
-                    success=true
-                    count_success=$((count_success+1))
-                    break
-                else
-                    echo -e "\n${LOG_PFX} ${ERR} Datei zu klein."
-                fi
-            else
-                echo -e "\n${LOG_PFX} ${ERR} Kein PDF (Sonderheft/Kein Abo?)."
-            fi
+            case "$CTYPE" in
+                *pdf*|*octet-stream*)
+                    # Tatsächlicher Download
+                    SIZE=$(curl -# -b ${SESSION_FILE} -L -k "https://www.heise.de/select/${MAGAZINE}/archiv/${year}/${i}/download" -o "${BASE_PATH}.pdf" -w "%{size_download}")
+                    
+                    if [ "$SIZE" -gt "$MIN_PDF_SIZE" ]; then
+                        printf "\n${LOG_PFX} ${SUCCESS} Fertig ($((SIZE/1024/1024)) MB)\n"
+                        success=true
+                        count_success=$((count_success+1))
+                        break
+                    else
+                        printf "\n${LOG_PFX} ${ERR} Datei zu klein ($SIZE Bytes).\n"
+                    fi
+                    ;;
+                *)
+                    printf "\n${LOG_PFX} ${ERR} Kein PDF (Typ: $CTYPE). Eventuell kein Abo?\n"
+                    ;;
+            esac
             
-            [ $try -lt $MAX_TRIES ] && sleepbar $WAIT_TIME
+            if [ $try -lt $MAX_TRIES ]; then
+                sleepbar $WAIT_TIME
+            fi
             try=$((try+1))
         done
 
-        $success || { echo -e "${LOG_PFX} ${ERR} Download fehlgeschlagen."; count_fail=$((count_fail+1)); }
+        if [ "$success" = false ]; then
+            printf "${LOG_PFX} ${ERR} Download fehlgeschlagen.\n"
+            count_fail=$((count_fail+1))
+        fi
+        
+        i=$((i+1))
     done
 done
 
-echo "---------------------------------------------------------------"
-echo "Summary: $count_success downloaded, $count_fail failed, $count_skip skipped."
+printf "\n---------------------------------------------------------------\n"
+printf "Summary: $count_success ok, $count_fail failed, $count_skip skipped.\n"
+
+# Cleanup
 rm -f "$SESSION_FILE"
