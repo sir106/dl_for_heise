@@ -64,8 +64,8 @@ $verbose || CURL_OPTS="${CURL_OPTS} -s"
 # 1. Login Seite aufrufen & Tokens abgreifen
 LOGIN_HTML=$(curl ${CURL_OPTS} -F "username=${HEISE_USERNAME}" -F "password=${HEISE_PASSWORD}" -F "ajax=1" "https://www.heise.de/sso/login/login")
 
-# Extrahiere Token aus JSON Response
-TOKENS=$(echo "$LOGIN_HTML" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+# Extrahiere Token aus JSON Response (BusyBox / awk kompatibel)
+TOKENS=$(echo "$LOGIN_HTML" | awk -F'"token":"' '{for(i=2;i<=NF;i++){split($i,a,"\""); print a[1]}}')
 if [ -z "$TOKENS" ]; then
     # Fallback Methode, falls das Format abweicht
     TOKENS=$(echo "$LOGIN_HTML" | sed "s/token/\ntoken/g" | grep ^token | cut -f 3 -d '"')
