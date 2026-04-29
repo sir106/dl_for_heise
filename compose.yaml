@@ -71,6 +71,11 @@ services:
       EOF
       
       echo "Heise Downloader bereit. Cronjob eingerichtet."
+      
+      # Führe einen initialen Download im Hintergrund aus, damit das Verzeichnis sofort beim Start befüllt wird
+      echo "Starte initialen Download im Hintergrund..."
+      /usr/local/bin/run_job.sh &
+      
       exec crond -f -l 2'
 
     env_file:
