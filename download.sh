@@ -70,7 +70,8 @@ token1=$(cat ${curl_session_file}.html | sed "s/token/\ntoken/g" | grep ^token |
 token2=$(cat ${curl_session_file}.html | sed "s/token/\ntoken/g" | grep ^token | head -2 | tail -1 | cut -f 3 -d '"')
 curl ${curlparams} -F "token=${token1}" "https://m.heise.de/sso/login/remote-login" >/dev/null 2>&1
 curl ${curlparams} -F "token=${token2}" "https://shop.heise.de/customer/account/loginRemote" >/dev/null 2>&1
-
+echo "${logp}${try} Token1: ${token1})."
+echo "${logp}${try} Token2: ${token2})."
 # Download PDFs and Thumbnails
 for year in $(seq -f %g ${start_year} ${end_year}); do
     $verbose && printf "${info} YEAR ${year}\n" 
