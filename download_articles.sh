@@ -81,13 +81,30 @@ save_article_with_chromium() {
 
 # Login
 echo "Logging in..."
+
+if [ -z "${HEISE_USERNAME}" ] || [ -z "${HEISE_PASSWORD}" ]; then
+    echo "Error: HEISE_USERNAME and HEISE_PASSWORD must be set in the .env file or environment variables."
+    exit 1
+fi
+
 curlparams="--no-progress-meter -b ${curl_session_file} -c ${curl_session_file} -k -L"
 curl ${curlparams} "https://www.heise.de/sso/login" >/dev/null 2>&1
 curl ${curlparams} -F 'forward=' -F "username=${HEISE_USERNAME}" -F "password=${HEISE_PASSWORD}" -F 'ajax=1' "https://www.heise.de/sso/login/login" -o ${curl_session_file}.html
+
+# Extract tokens (handles both HTML attributes and JSON responses implicitly based on previous behavior, but made safer)
 token1=$(cat ${curl_session_file}.html | sed "s/token/\ntoken/g" | grep ^token | head -1 | cut -f 3 -d '"')
 token2=$(cat ${curl_session_file}.html | sed "s/token/\ntoken/g" | grep ^token | head -2 | tail -1 | cut -f 3 -d '"')
+
+if [ -z "$token1" ]; then
+    echo "Error: Login failed. Could not retrieve login tokens. Please check your credentials."
+    rm -f ${curl_session_file}*
+    exit 1
+fi
+
 curl ${curlparams} -F "token=${token1}" "https://m.heise.de/sso/login/remote-login" >/dev/null 2>&1
-curl ${curlparams} -F "token=${token2}" "https://shop.heise.de/customer/account/loginRemote" >/dev/null 2>&1
+if [ -n "$token2" ] && [ "$token2" != "$token1" ]; then
+    curl ${curlparams} -F "token=${token2}" "https://shop.heise.de/customer/account/loginRemote" >/dev/null 2>&1
+fi
 
 # Download PDFs and Thumbnails
 for year in $(seq -f %g ${start_year} ${end_year}); do
