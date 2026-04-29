@@ -3,9 +3,10 @@
 # Konfiguration
 [ -f ".env" ] && . ./.env
 
-MIN_PDF_SIZE=5000000
-WAIT_TIME=80
-MAX_TRIES=3
+MIN_PDF_SIZE=5000000 # minimum file size to check if downloaded file is a valid pdf
+WAIT_TIME=80 # wait a few seconds between repetitions on errors to prevent rate limiting
+MAX_TRIES=3 # if a download fails (or is not a valid pdf), repeat this often
+
 MAX_ISSUES=27 # c't hat bis zu 27 Ausgaben
 
 # Farben
