@@ -124,12 +124,12 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
             
             # 1. Vorab die Übersichtsseite des Hefts aufrufen (wichtig für Session-Cookies / Paywall-Freigabe)
             PAGE_URL="https://www.heise.de/select/${MAGAZINE}/archiv/${year}/${i}"
-            $verbose && echo -e "\n${LOG_PFX} Visiting issue page first to initialize session..."
+            $verbose && echo -e "\n${LOG_PFX} Visiting issue page first to initialize session ($PAGE_URL)..."
             curl -A "$UA" -s -b "${SESSION_FILE}" -c "${SESSION_FILE}" -L -k "$PAGE_URL" > /dev/null
             
             # 2. Direkter Download
             DOWNLOAD_URL="https://www.heise.de/select/${MAGAZINE}/archiv/${year}/${i}/download"
-            $verbose && echo -e "${LOG_PFX} Starting download..."
+            $verbose && echo -e "${LOG_PFX} Starting download ($DOWNLOAD_URL).."
             SIZE=$(curl -A "$UA" -# -b "${SESSION_FILE}" -c "${SESSION_FILE}" -L -k "$DOWNLOAD_URL" -o "${BASE_PATH}.pdf" -w "%{size_download}")
             
             # Prüfen, ob die Datei groß genug für ein echtes PDF ist
