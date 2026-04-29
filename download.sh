@@ -138,7 +138,7 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
                 count_success=$((count_success+1))
                 
                 # Kurze Pause nach Erfolg, um Sperren bei schnellen aufeinanderfolgenden Downloads zu verhindern
-                $verbose && echo -e "${LOG_PFX} Sleeping 15s to be polite to the server..."
+                $verbose && echo -e "${LOG_PFX} Sleeping 60s to be polite to the server..."
                 sleep 60
                 break
             else
