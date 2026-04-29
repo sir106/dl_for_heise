@@ -62,6 +62,7 @@ CURL_OPTS="-L -k -b ${SESSION_FILE} -c ${SESSION_FILE} --no-progress-meter"
 $verbose || CURL_OPTS="${CURL_OPTS} -s"
 
 # 1. Login Seite aufrufen & Tokens abgreifen
+echo -e "${INFO} Sending login request to heise.de..."
 LOGIN_HTML=$(curl ${CURL_OPTS} -F "username=${HEISE_USERNAME}" -F "password=${HEISE_PASSWORD}" -F "ajax=1" "https://www.heise.de/sso/login/login")
 
 # Extrahiere Token aus JSON Response (BusyBox / awk kompatibel)
@@ -81,10 +82,13 @@ if [ -z "$TOKEN1" ]; then
 fi
 
 # 2. SSO Remote Logins
+echo -e "${INFO} Login successful. Extracted tokens, performing SSO remote logins..."
 curl ${CURL_OPTS} -F "token=${TOKEN1}" "https://m.heise.de/sso/login/remote-login" >/dev/null
 if [ -n "$TOKEN2" ] && [ "$TOKEN2" != "$TOKEN1" ]; then
+    echo -e "${INFO} Performing secondary SSO shop login..."
     curl ${CURL_OPTS} -F "token=${TOKEN2}" "https://shop.heise.de/customer/account/loginRemote" >/dev/null
 fi
+echo -e "${SUCCESS} Login phase completed."
 
 # Download Loop
 for year in $(seq "$START_YEAR" "$END_YEAR"); do
@@ -98,13 +102,16 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
 
         # Thumbnail Test (Check ob Ausgabe existiert)
         mkdir -p "$(dirname "$BASE_PATH")"
+        $verbose && echo -e "${LOG_PFX} Checking if issue exists via thumbnail request..."
         HTTP_CODE=$(curl -o "${BASE_PATH}.jpg" -w "%{http_code}" ${CURL_OPTS} "https://heise.cloudimg.io/v7/_www-heise-de_/select/thumbnail/${MAGAZINE}/${year}/${i}.jpg")
 
         if [ "$HTTP_CODE" -ne 200 ]; then
+            $verbose && echo -e "${LOG_PFX} ${SKIP} Thumbnail not found (HTTP $HTTP_CODE). Issue might not exist."
             rm -f "${BASE_PATH}.jpg"
             # Nach Ausgabe 13 (oder 27) aufhören, falls nichts mehr kommt
             [ "$i" -gt 13 ] && break || continue
         fi
+        $verbose && echo -e "${LOG_PFX} Issue found. Starting download sequence."
 
 # PDF Download Versuche
         try=1
@@ -113,7 +120,9 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
             printf "${LOG_PFX} [Try $try/$MAX_TRIES] Downloading...\r"
             
             # Header Check (Content-Type)
-            CTYPE=$(curl -I ${CURL_OPTS} "https://www.heise.de/select/${MAGAZINE}/archiv/${year}/${i}/download" | grep -i "Content-Type" | cut -d' ' -f2 | tr -d '\r')
+            $verbose && echo -e "${LOG_PFX} Requesting HTTP headers to check Content-Type..."
+            CTYPE=$(curl -I ${CURL_OPTS} "https://www.heise.de/select/${MAGAZINE}/archiv/${year}/${i}/download" | grep -i "^Content-Type:" | tail -1 | cut -d' ' -f2 | tr -d '\r')
+            $verbose && echo -e "${LOG_PFX} Server returned Content-Type: $CTYPE"
             
             case "$CTYPE" in
                 *pdf*|*octet-stream*)
@@ -151,4 +160,6 @@ printf "\n---------------------------------------------------------------\n"
 printf "Summary: $count_success ok, $count_fail failed, $count_skip skipped.\n"
 
 # Cleanup
+echo -e "${INFO} Cleaning up session files..."
 rm -f "$SESSION_FILE"
+echo -e "${INFO} Done!"
