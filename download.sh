@@ -121,12 +121,7 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
         success=false
         while [ $try -le $MAX_TRIES ]; do
             printf "${LOG_PFX} [Try $try/$MAX_TRIES] Downloading...\r"
-            
-            # 1. Vorab die Übersichtsseite des Hefts aufrufen (wichtig für Session-Cookies / Paywall-Freigabe)
-            PAGE_URL="https://www.heise.de/select/${MAGAZINE}/archiv/${year}/${i}"
-            $verbose && echo -e "\n${LOG_PFX} Visiting issue page first to initialize session ($PAGE_URL)..."
-            curl -A "$UA" -s -b "${SESSION_FILE}" -c "${SESSION_FILE}" -L -k "$PAGE_URL" > /dev/null
-            
+                       
             # 2. Direkter Download
             DOWNLOAD_URL="https://www.heise.de/select/${MAGAZINE}/archiv/${year}/${i}/download"
             $verbose && echo -e "${LOG_PFX} Starting download ($DOWNLOAD_URL).."
@@ -144,7 +139,7 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
                 
                 # Kurze Pause nach Erfolg, um Sperren bei schnellen aufeinanderfolgenden Downloads zu verhindern
                 $verbose && echo -e "${LOG_PFX} Sleeping 15s to be polite to the server..."
-                sleep 15
+                sleep 60
                 break
             else
                 # Wenn es zu klein ist, war es wahrscheinlich eine HTML Fehlerseite (Rate Limit / Kein Abo)
