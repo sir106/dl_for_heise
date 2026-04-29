@@ -8,6 +8,7 @@ WAIT_TIME=80 # wait a few seconds between repetitions on errors to prevent rate 
 MAX_TRIES=3 # if a download fails (or is not a valid pdf), repeat this often
 
 MAX_ISSUES=27 # c't hat bis zu 27 Ausgaben
+DOWNLOAD_DIR="/downloads" # Absoluter Pfad für alle Downloads
 
 # Farben
 INFO="[\033[0;36mINFO\033[0m]"
@@ -95,7 +96,7 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
     $verbose && echo -e "${INFO} Processing Year $year"
     for i in $(seq 1 "$MAX_ISSUES"); do
         ISSUE=$(printf "%02d" "$i")
-        BASE_PATH="${MAGAZINE}/${year}/${MAGAZINE}.${year}.${ISSUE}"
+        BASE_PATH="${DOWNLOAD_DIR}/${MAGAZINE}/${year}/${MAGAZINE}.${year}.${ISSUE}"
         LOG_PFX="[$MAGAZINE][$year/$ISSUE]"
 
         [ -f "${BASE_PATH}.pdf" ] && { echo -e "${LOG_PFX} ${SKIP} Existiert bereits."; count_skip=$((count_skip+1)); continue; }
@@ -129,7 +130,7 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
                 printf "\n${LOG_PFX} ${SUCCESS} Fertig ($((SIZE/1024/1024)) MB)\n"
                 
                 # In eigenes Logfile schreiben
-                echo "$(date '+%Y-%m-%d %H:%M:%S') - Erfolgreich geladen: ${BASE_PATH}.pdf - Quelle: $DOWNLOAD_URL" >> download_history.log
+                echo "$(date '+%Y-%m-%d %H:%M:%S') - Erfolgreich geladen: ${BASE_PATH}.pdf - Quelle: $DOWNLOAD_URL" >> "${DOWNLOAD_DIR}/download_history.log"
                 
                 success=true
                 count_success=$((count_success+1))
