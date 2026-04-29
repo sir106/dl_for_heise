@@ -122,10 +122,15 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
         while [ $try -le $MAX_TRIES ]; do
             printf "${LOG_PFX} [Try $try/$MAX_TRIES] Downloading...\r"
             
-            # Direkter Download ohne HEAD-Request (spart Requests und vermeidet Rate-Limits)
+            # 1. Vorab die Übersichtsseite des Hefts aufrufen (wichtig für Session-Cookies / Paywall-Freigabe)
+            PAGE_URL="https://www.heise.de/select/${MAGAZINE}/archiv/${year}/${i}"
+            $verbose && echo -e "\n${LOG_PFX} Visiting issue page first to initialize session..."
+            curl -A "$UA" -s -b "${SESSION_FILE}" -c "${SESSION_FILE}" -L -k "$PAGE_URL" > /dev/null
+            
+            # 2. Direkter Download
             DOWNLOAD_URL="https://www.heise.de/select/${MAGAZINE}/archiv/${year}/${i}/download"
-            $verbose && echo -e "\n${LOG_PFX} Starting download..."
-            SIZE=$(curl -A "$UA" -# -b ${SESSION_FILE} -c ${SESSION_FILE} -L -k "$DOWNLOAD_URL" -o "${BASE_PATH}.pdf" -w "%{size_download}")
+            $verbose && echo -e "${LOG_PFX} Starting download..."
+            SIZE=$(curl -A "$UA" -# -b "${SESSION_FILE}" -c "${SESSION_FILE}" -L -k "$DOWNLOAD_URL" -o "${BASE_PATH}.pdf" -w "%{size_download}")
             
             # Prüfen, ob die Datei groß genug für ein echtes PDF ist
             if [ "$SIZE" -gt "$MIN_PDF_SIZE" ]; then
@@ -146,7 +151,11 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
                 HTML_SNIPPET=$(head -c 150 "${BASE_PATH}.pdf" | tr '\n' ' ' | sed 's/  */ /g' 2>/dev/null)
                 printf "\n${LOG_PFX} ${ERR} Download fehlgeschlagen oder kein PDF (Größe: $SIZE Bytes).\n"
                 $verbose && echo -e "${LOG_PFX} Server response snippet: $HTML_SNIPPET..."
-                rm -f "${BASE_PATH}.pdf"
+                
+                # HTML Datei für die spätere Fehleranalyse speichern statt sie zu löschen
+                ERROR_HTML="${BASE_PATH}_error_try${try}.html"
+                mv "${BASE_PATH}.pdf" "${ERROR_HTML}"
+                $verbose && echo -e "${LOG_PFX} Saved HTML response to ${ERROR_HTML}"
             fi
             
             if [ $try -lt $MAX_TRIES ]; then
