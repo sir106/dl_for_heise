@@ -1,0 +1,85 @@
+# Stack Name: heise-scraper
+# Description: regelmäßiger Download aller Heise+ Ausgaben
+#
+services:
+  # -----------------------------
+  # heise-downloader
+  # -----------------------------
+  # GitHub: https://github.com/sir106/dl_for_heise/
+  # DockerHub:
+  # Doku:
+  # Howto:
+  #
+  heise-downloader:
+    image: alpine:latest
+    container_name: heise_dl
+    restart: on-failure:5
+                   
+    volumes:
+      # VOLUMES default
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+
+      # VOLUMES XYZ (Es muss zwingend ein Zielpfad im Container angegeben werden!)
+      - /mnt/proxshare/lib-downloads/heise:/downloads
+      
+    environment:
+      # ENVIRONMENT default
+      - TZ=Europe/Berlin
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+
+      # REPO_URL wird gesetzt. HEISE_USERNAME und HEISE_PASSWORD kommen direkt via env_file aus .env
+      - REPO_URL=${REPO_URL:-https://github.com/sir106/dl_for_heise/}
+      
+    entrypoint: |
+      /bin/sh -c '
+      # Pakete installieren
+      apk add --no-cache git curl bash coreutils ca-certificates
+      
+      # Zertifikate aktualisieren
+      update-ca-certificates      
+      
+      # Initiales Klonen falls noch nicht vorhanden
+      if [ ! -d "/app/.git" ]; then
+        git clone $${REPO_URL:-https://github.com/sir106/dl_for_heise/} /app
+      fi
+      
+      # Update- und Download-Skript (run_job.sh) erstellen
+      # Dieses Skript wird bei jedem Cron-Durchlauf ausgeführt
+      cat << "EOF" > /usr/local/bin/run_job.sh
+      #!/bin/sh
+      echo "---------------------------------------------------------------" >> /downloads/download.log
+      echo "[$(date)] Starting Heise Download Job" >> /downloads/download.log
+      
+      # Repo vor jedem Download aktualisieren
+      cd /app && git pull >> /downloads/download.log 2>&1
+      chmod +x /app/download.sh
+      
+      # Download ausführen
+      cd /downloads && /app/download.sh -v ct $(date +%Y) >> /downloads/download.log 2>&1
+      
+      echo "[$(date)] Job finished" >> /downloads/download.log
+      EOF
+      
+      chmod +x /usr/local/bin/run_job.sh
+
+      # Cronjob einrichten
+      # Alpine verlangt crontab-Syntax in /etc/crontabs/root
+      cat << "EOF" > /etc/crontabs/root
+      0 3 * * 1 /usr/local/bin/run_job.sh
+      EOF
+      
+      echo "Heise Downloader bereit. Cronjob eingerichtet."
+      exec crond -f -l 2'
+
+    env_file:
+      - .env
+
+# ------------------------------
+# Volumes
+# ------------------------------
+
+# ------------------------------
+# Networks
+# ------------------------------      
