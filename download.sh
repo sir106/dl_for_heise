@@ -10,6 +10,9 @@ MAX_TRIES=3 # if a download fails (or is not a valid pdf), repeat this often
 MAX_ISSUES=27 # c't hat bis zu 27 Ausgaben
 DOWNLOAD_DIR="/downloads" # Absoluter Pfad für alle Downloads
 
+# Browser Tarnung (User-Agent)
+UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
 # Farben
 INFO="[\033[0;36mINFO\033[0m]"
 SUCCESS="[\033[0;32mSUCCESS\033[0m]"
@@ -64,7 +67,7 @@ $verbose || CURL_OPTS="${CURL_OPTS} -s"
 
 # 1. Login Seite aufrufen & Tokens abgreifen
 echo -e "${INFO} Sending login request to heise.de..."
-LOGIN_HTML=$(curl ${CURL_OPTS} -F "username=${HEISE_USERNAME}" -F "password=${HEISE_PASSWORD}" -F "ajax=1" "https://www.heise.de/sso/login/login")
+LOGIN_HTML=$(curl -A "$UA" ${CURL_OPTS} -F "username=${HEISE_USERNAME}" -F "password=${HEISE_PASSWORD}" -F "ajax=1" "https://www.heise.de/sso/login/login")
 
 # Extrahiere Token aus JSON Response (BusyBox / awk kompatibel)
 TOKENS=$(echo "$LOGIN_HTML" | awk -F'"token":"' '{for(i=2;i<=NF;i++){split($i,a,"\""); print a[1]}}')
@@ -84,10 +87,10 @@ fi
 
 # 2. SSO Remote Logins
 echo -e "${INFO} Login successful. Extracted tokens, performing SSO remote logins..."
-curl ${CURL_OPTS} -F "token=${TOKEN1}" "https://m.heise.de/sso/login/remote-login" >/dev/null
+curl -A "$UA" ${CURL_OPTS} -F "token=${TOKEN1}" "https://m.heise.de/sso/login/remote-login" >/dev/null
 if [ -n "$TOKEN2" ] && [ "$TOKEN2" != "$TOKEN1" ]; then
     echo -e "${INFO} Performing secondary SSO shop login..."
-    curl ${CURL_OPTS} -F "token=${TOKEN2}" "https://shop.heise.de/customer/account/loginRemote" >/dev/null
+    curl -A "$UA" ${CURL_OPTS} -F "token=${TOKEN2}" "https://shop.heise.de/customer/account/loginRemote" >/dev/null
 fi
 echo -e "${SUCCESS} Login phase completed."
 
@@ -104,7 +107,7 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
         # Thumbnail Test (Check ob Ausgabe existiert, ohne JPG zu speichern)
         mkdir -p "$(dirname "$BASE_PATH")"
         $verbose && echo -e "${LOG_PFX} Checking if issue exists via thumbnail request..."
-        HTTP_CODE=$(curl -o /dev/null -w "%{http_code}" ${CURL_OPTS} "https://heise.cloudimg.io/v7/_www-heise-de_/select/thumbnail/${MAGAZINE}/${year}/${i}.jpg")
+        HTTP_CODE=$(curl -A "$UA" -o /dev/null -w "%{http_code}" ${CURL_OPTS} "https://heise.cloudimg.io/v7/_www-heise-de_/select/thumbnail/${MAGAZINE}/${year}/${i}.jpg")
 
         if [ "$HTTP_CODE" -ne 200 ]; then
             $verbose && echo -e "${LOG_PFX} ${SKIP} Thumbnail not found (HTTP $HTTP_CODE). Issue might not exist."
@@ -122,7 +125,7 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
             # Direkter Download ohne HEAD-Request (spart Requests und vermeidet Rate-Limits)
             DOWNLOAD_URL="https://www.heise.de/select/${MAGAZINE}/archiv/${year}/${i}/download"
             $verbose && echo -e "\n${LOG_PFX} Starting download..."
-            SIZE=$(curl -# -b ${SESSION_FILE} -c ${SESSION_FILE} -L -k "$DOWNLOAD_URL" -o "${BASE_PATH}.pdf" -w "%{size_download}")
+            SIZE=$(curl -A "$UA" -# -b ${SESSION_FILE} -c ${SESSION_FILE} -L -k "$DOWNLOAD_URL" -o "${BASE_PATH}.pdf" -w "%{size_download}")
             
             # Prüfen, ob die Datei groß genug für ein echtes PDF ist
             if [ "$SIZE" -gt "$MIN_PDF_SIZE" ]; then
