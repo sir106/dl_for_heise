@@ -101,14 +101,13 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
 
         [ -f "${BASE_PATH}.pdf" ] && { echo -e "${LOG_PFX} ${SKIP} Existiert bereits."; count_skip=$((count_skip+1)); continue; }
 
-        # Thumbnail Test (Check ob Ausgabe existiert)
+        # Thumbnail Test (Check ob Ausgabe existiert, ohne JPG zu speichern)
         mkdir -p "$(dirname "$BASE_PATH")"
         $verbose && echo -e "${LOG_PFX} Checking if issue exists via thumbnail request..."
-        HTTP_CODE=$(curl -o "${BASE_PATH}.jpg" -w "%{http_code}" ${CURL_OPTS} "https://heise.cloudimg.io/v7/_www-heise-de_/select/thumbnail/${MAGAZINE}/${year}/${i}.jpg")
+        HTTP_CODE=$(curl -o /dev/null -w "%{http_code}" ${CURL_OPTS} "https://heise.cloudimg.io/v7/_www-heise-de_/select/thumbnail/${MAGAZINE}/${year}/${i}.jpg")
 
         if [ "$HTTP_CODE" -ne 200 ]; then
             $verbose && echo -e "${LOG_PFX} ${SKIP} Thumbnail not found (HTTP $HTTP_CODE). Issue might not exist."
-            rm -f "${BASE_PATH}.jpg"
             # Nach Ausgabe 13 (oder 27) aufhören, falls nichts mehr kommt
             [ "$i" -gt 13 ] && break || continue
         fi

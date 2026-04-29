@@ -57,7 +57,7 @@ services:
 
         # 4. Hilfsskript erstellen
         echo '#!/bin/bash' > /usr/local/bin/run_download.sh
-        echo 'cd /downloads && /app/download.sh -v ct $$(date +%Y) >> /downloads/download.log 2>&1' >> /usr/local/bin/run_download.sh
+        echo 'cd /downloads && /app/download.sh -v ct $$(date +%Y) >> /downloads/download_console.log 2>&1' >> /usr/local/bin/run_download.sh
         chmod +x /usr/local/bin/run_download.sh
 
         # 5. Cronjob einrichten
@@ -65,7 +65,7 @@ services:
         echo "0 3 * * 1 /usr/local/bin/run_download.sh" > /var/spool/cron/crontabs/root
         
         echo "Heise Downloader bereit. Starte initialen Download im Hintergrund..."
-        /usr/local/bin/run_download.sh &
+        # /usr/local/bin/run_download.sh &
         
         # Crond im Vordergrund
         exec crond -f -l 2
