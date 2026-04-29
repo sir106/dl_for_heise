@@ -64,19 +64,27 @@ $verbose || CURL_OPTS="${CURL_OPTS} -s"
 # 1. Login Seite aufrufen & Tokens abgreifen
 LOGIN_HTML=$(curl ${CURL_OPTS} -F "username=${HEISE_USERNAME}" -F "password=${HEISE_PASSWORD}" -F "ajax=1" "https://www.heise.de/sso/login/login")
 
-# Extrahiere Zeilen, die token=" enthalten, und schneide den Wert aus (optimiert für BusyBox / Docker)
-TOKENS=$(echo "$LOGIN_HTML" | grep -o 'token="[^"]*"' | cut -d'"' -f2)
+# Extrahiere Token aus JSON Response
+TOKENS=$(echo "$LOGIN_HTML" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+if [ -z "$TOKENS" ]; then
+    # Fallback Methode, falls das Format abweicht
+    TOKENS=$(echo "$LOGIN_HTML" | sed "s/token/\ntoken/g" | grep ^token | cut -f 3 -d '"')
+fi
+
 TOKEN1=$(echo "$TOKENS" | sed -n '1p')
 TOKEN2=$(echo "$TOKENS" | sed -n '2p')
 
 if [ -z "$TOKEN1" ]; then
     echo -e "${ERR} Login fehlgeschlagen (Token konnte nicht extrahiert werden)."
+    rm -f "$SESSION_FILE"
     exit 1
 fi
 
 # 2. SSO Remote Logins
 curl ${CURL_OPTS} -F "token=${TOKEN1}" "https://m.heise.de/sso/login/remote-login" >/dev/null
-curl ${CURL_OPTS} -F "token=${TOKEN2}" "https://shop.heise.de/customer/account/loginRemote" >/dev/null
+if [ -n "$TOKEN2" ] && [ "$TOKEN2" != "$TOKEN1" ]; then
+    curl ${CURL_OPTS} -F "token=${TOKEN2}" "https://shop.heise.de/customer/account/loginRemote" >/dev/null
+fi
 
 # Download Loop
 for year in $(seq "$START_YEAR" "$END_YEAR"); do
@@ -136,8 +144,6 @@ for year in $(seq "$START_YEAR" "$END_YEAR"); do
             printf "${LOG_PFX} ${ERR} Download fehlgeschlagen.\n"
             count_fail=$((count_fail+1))
         fi
-        
-        i=$((i+1))
     done
 done
 
